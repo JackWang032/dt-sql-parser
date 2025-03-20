@@ -1,7 +1,8 @@
-import { CharStream, CommonTokenStream, Token } from 'antlr4ng';
 import { CandidatesCollection } from 'antlr4-c3';
+import { CharStream, CommonTokenStream, Token } from 'antlr4ng';
+import { processTokenCandidates } from '../common/tokenUtils';
 import { SparkSqlLexer } from '../../lib/spark/SparkSqlLexer';
-import { SparkSqlParser, ProgramContext } from '../../lib/spark/SparkSqlParser';
+import { ProgramContext, SparkSqlParser } from '../../lib/spark/SparkSqlParser';
 import { BasicSQL } from '../common/basicSQL';
 import {
     Suggestions,
@@ -11,13 +12,13 @@ import {
     SemanticCollectOptions,
 } from '../common/types';
 import { StmtContextType } from '../common/entityCollector';
-import { SparkSqlSplitListener } from './sparkSplitListener';
 import { SparkEntityCollector } from './sparkEntityCollector';
 import { SparkErrorListener } from './sparkErrorListener';
-import { ErrorListener } from '../common/parseErrorListener';
 import { SparkSemanticContextCollector } from './sparkSemanticContextCollector';
+import { SparkSqlSplitListener } from './sparkSplitListener';
+import { ErrorListener } from '../common/parseErrorListener';
 
-export { SparkSqlSplitListener, SparkEntityCollector };
+export { SparkEntityCollector, SparkSqlSplitListener };
 
 export class SparkSQL extends BasicSQL<SparkSqlLexer, ProgramContext, SparkSqlParser> {
     protected createLexerFromCharStream(charStreams: CharStream) {
@@ -49,9 +50,8 @@ export class SparkSQL extends BasicSQL<SparkSqlLexer, ProgramContext, SparkSqlPa
         const parserContext = this;
         return new SparkErrorListener(_errorListener, parserContext, this.preferredRules);
     }
-
-    protected createEntityCollector(input: string, caretTokenIndex?: number) {
-        return new SparkEntityCollector(input, caretTokenIndex);
+    protected createEntityCollector(input: string, allTokens?: Token[], caretTokenIndex?: number) {
+        return new SparkEntityCollector(input, allTokens, caretTokenIndex);
     }
 
     protected createSemanticContextCollector(
@@ -134,17 +134,8 @@ export class SparkSQL extends BasicSQL<SparkSqlLexer, ProgramContext, SparkSqlPa
             }
         }
 
-        for (const candidate of candidates.tokens) {
-            const symbolicName = this._parser.vocabulary.getSymbolicName(candidate[0]);
-            const displayName = this._parser.vocabulary.getDisplayName(candidate[0]);
-            if (displayName && symbolicName && symbolicName.startsWith('KW_')) {
-                const keyword =
-                    displayName.startsWith("'") && displayName.endsWith("'")
-                        ? displayName.slice(1, -1)
-                        : displayName;
-                keywords.push(keyword);
-            }
-        }
+        const processedKeywords = processTokenCandidates(this._parser, candidates.tokens);
+        keywords.push(...processedKeywords);
 
         return {
             syntax: originalSyntaxSuggestions,

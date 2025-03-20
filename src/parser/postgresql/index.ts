@@ -1,5 +1,6 @@
 import { CandidatesCollection } from 'antlr4-c3';
 import { CharStream, CommonTokenStream, Token } from 'antlr4ng';
+import { processTokenCandidates } from '../common/tokenUtils';
 
 import { PostgreSqlLexer } from '../../lib/postgresql/PostgreSqlLexer';
 import { PostgreSqlParser, ProgramContext } from '../../lib/postgresql/PostgreSqlParser';
@@ -12,12 +13,11 @@ import {
 } from '../common/types';
 import { BasicSQL } from '../common/basicSQL';
 import { StmtContextType } from '../common/entityCollector';
-import { PostgreSqlEntityCollector } from './postgreEntityCollector';
-import { PostgreSqlSplitListener } from './postgreSplitListener';
 import { ErrorListener } from '../common/parseErrorListener';
+import { PostgreSqlEntityCollector } from './postgreEntityCollector';
 import { PostgreSqlErrorListener } from './postgreErrorListener';
+import { PostgreSqlSplitListener } from './postgreSplitListener';
 import { PostgreSemanticContextCollector } from './postgreSemanticContextCollector';
-
 export { PostgreSqlEntityCollector, PostgreSqlSplitListener };
 
 export class PostgreSQL extends BasicSQL<PostgreSqlLexer, ProgramContext, PostgreSqlParser> {
@@ -54,9 +54,8 @@ export class PostgreSQL extends BasicSQL<PostgreSqlLexer, ProgramContext, Postgr
         const parserContext = this;
         return new PostgreSqlErrorListener(_errorListener, parserContext, this.preferredRules);
     }
-
-    protected createEntityCollector(input: string, caretTokenIndex?: number) {
-        return new PostgreSqlEntityCollector(input, caretTokenIndex);
+    protected createEntityCollector(input: string, allTokens?: Token[], caretTokenIndex?: number) {
+        return new PostgreSqlEntityCollector(input, allTokens, caretTokenIndex);
     }
 
     protected createSemanticContextCollector(
@@ -154,17 +153,9 @@ export class PostgreSQL extends BasicSQL<PostgreSqlLexer, ProgramContext, Postgr
             }
         }
 
-        for (let candidate of candidates.tokens) {
-            const symbolicName = this._parser.vocabulary.getSymbolicName(candidate[0]);
-            const displayName = this._parser.vocabulary.getDisplayName(candidate[0]);
-            if (displayName && symbolicName && symbolicName.startsWith('KW_')) {
-                const keyword =
-                    displayName.startsWith("'") && displayName.endsWith("'")
-                        ? displayName.slice(1, -1)
-                        : displayName;
-                keywords.push(keyword);
-            }
-        }
+        const processedKeywords = processTokenCandidates(this._parser, candidates.tokens);
+        keywords.push(...processedKeywords);
+
         return {
             syntax: originalSyntaxSuggestions,
             keywords,

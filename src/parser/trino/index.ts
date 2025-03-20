@@ -1,7 +1,8 @@
-import { CharStream, CommonTokenStream, Token } from 'antlr4ng';
 import { CandidatesCollection } from 'antlr4-c3';
+import { CharStream, CommonTokenStream, Token } from 'antlr4ng';
+import { processTokenCandidates } from '../common/tokenUtils';
 import { TrinoSqlLexer } from '../../lib/trino/TrinoSqlLexer';
-import { TrinoSqlParser, ProgramContext } from '../../lib/trino/TrinoSqlParser';
+import { ProgramContext, TrinoSqlParser } from '../../lib/trino/TrinoSqlParser';
 import { BasicSQL } from '../common/basicSQL';
 import {
     Suggestions,
@@ -11,13 +12,13 @@ import {
     SemanticCollectOptions,
 } from '../common/types';
 import { StmtContextType } from '../common/entityCollector';
-import { TrinoSqlSplitListener } from './trinoSplitListener';
-import { TrinoEntityCollector } from './trinoEntityCollector';
 import { ErrorListener } from '../common/parseErrorListener';
+import { TrinoEntityCollector } from './trinoEntityCollector';
 import { TrinoErrorListener } from './trinoErrorListener';
 import { TrinoSemanticContextCollector } from './trinoSemanticContextCollector';
+import { TrinoSqlSplitListener } from './trinoSplitListener';
 
-export { TrinoSqlSplitListener, TrinoEntityCollector };
+export { TrinoEntityCollector, TrinoSqlSplitListener };
 
 export class TrinoSQL extends BasicSQL<TrinoSqlLexer, ProgramContext, TrinoSqlParser> {
     protected createLexerFromCharStream(charStreams: CharStream) {
@@ -36,9 +37,8 @@ export class TrinoSQL extends BasicSQL<TrinoSqlLexer, ProgramContext, TrinoSqlPa
         const parserContext = this;
         return new TrinoErrorListener(_errorListener, parserContext, this.preferredRules);
     }
-
-    protected createEntityCollector(input: string, caretTokenIndex?: number) {
-        return new TrinoEntityCollector(input, caretTokenIndex);
+    protected createEntityCollector(input: string, allTokens?: Token[], caretTokenIndex?: number) {
+        return new TrinoEntityCollector(input, allTokens, caretTokenIndex);
     }
 
     protected createSemanticContextCollector(
@@ -144,17 +144,9 @@ export class TrinoSQL extends BasicSQL<TrinoSqlLexer, ProgramContext, TrinoSqlPa
             }
         }
 
-        for (let candidate of candidates.tokens) {
-            const symbolicName = this._parser.vocabulary.getSymbolicName(candidate[0]);
-            const displayName = this._parser.vocabulary.getDisplayName(candidate[0]);
-            if (displayName && symbolicName && symbolicName.startsWith('KW_')) {
-                const keyword =
-                    displayName.startsWith("'") && displayName.endsWith("'")
-                        ? displayName.slice(1, -1)
-                        : displayName;
-                keywords.push(keyword);
-            }
-        }
+        const processedKeywords = processTokenCandidates(this._parser, candidates.tokens);
+        keywords.push(...processedKeywords);
+
         return {
             syntax: originalSyntaxSuggestions,
             keywords,

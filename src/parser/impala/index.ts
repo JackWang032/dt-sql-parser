@@ -1,5 +1,6 @@
-import { CharStream, CommonTokenStream, Token } from 'antlr4ng';
 import { CandidatesCollection } from 'antlr4-c3';
+import { CharStream, CommonTokenStream, Token } from 'antlr4ng';
+import { processTokenCandidates } from '../common/tokenUtils';
 import { ImpalaSqlLexer } from '../../lib/impala/ImpalaSqlLexer';
 import { ImpalaSqlParser, ProgramContext } from '../../lib/impala/ImpalaSqlParser';
 import { BasicSQL } from '../common/basicSQL';
@@ -11,11 +12,11 @@ import {
     SyntaxSuggestion,
 } from '../common/types';
 import { StmtContextType } from '../common/entityCollector';
-import { ImpalaSqlSplitListener } from './impalaSplitListener';
-import { ImpalaEntityCollector } from './impalaEntityCollector';
 import { ErrorListener } from '../common/parseErrorListener';
+import { ImpalaEntityCollector } from './impalaEntityCollector';
 import { ImpalaErrorListener } from './ImpalaErrorListener';
 import { ImpalaSemanticContextCollector } from './impalaSemanticContextCollector';
+import { ImpalaSqlSplitListener } from './impalaSplitListener';
 
 export { ImpalaEntityCollector, ImpalaSqlSplitListener };
 
@@ -49,9 +50,8 @@ export class ImpalaSQL extends BasicSQL<ImpalaSqlLexer, ProgramContext, ImpalaSq
         const parserContext = this;
         return new ImpalaErrorListener(_errorListener, parserContext, this.preferredRules);
     }
-
-    protected createEntityCollector(input: string, caretTokenIndex?: number) {
-        return new ImpalaEntityCollector(input, caretTokenIndex);
+    protected createEntityCollector(input: string, allTokens?: Token[], caretTokenIndex?: number) {
+        return new ImpalaEntityCollector(input, allTokens, caretTokenIndex);
     }
 
     protected createSemanticContextCollector(
@@ -132,17 +132,9 @@ export class ImpalaSQL extends BasicSQL<ImpalaSqlLexer, ProgramContext, ImpalaSq
             }
         }
 
-        for (let candidate of candidates.tokens) {
-            const symbolicName = this._parser.vocabulary.getSymbolicName(candidate[0]);
-            const displayName = this._parser.vocabulary.getDisplayName(candidate[0]);
-            if (displayName && symbolicName && symbolicName.startsWith('KW_')) {
-                const keyword =
-                    displayName.startsWith("'") && displayName.endsWith("'")
-                        ? displayName.slice(1, -1)
-                        : displayName;
-                keywords.push(keyword);
-            }
-        }
+        // 使用工具函数处理token候选项
+        const processedKeywords = processTokenCandidates(this._parser, candidates.tokens);
+        keywords.push(...processedKeywords);
         return {
             syntax: originalSyntaxSuggestions,
             keywords,

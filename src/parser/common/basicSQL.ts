@@ -96,6 +96,7 @@ export abstract class BasicSQL<
      */
     protected abstract createEntityCollector(
         input: string,
+        allTokens?: Token[],
         caretTokenIndex?: number
     ): EntityCollector;
 
@@ -447,7 +448,7 @@ export abstract class BasicSQL<
             ? findCaretTokenIndex(caretPosition, allTokens)
             : void 0;
 
-        const collectListener = this.createEntityCollector(input, caretTokenIndex);
+        const collectListener = this.createEntityCollector(input, allTokens, caretTokenIndex);
         // const parser = this.createParserWithCache(input);
 
         // parser.entityCollecting = true;

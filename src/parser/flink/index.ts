@@ -1,5 +1,6 @@
-import { CharStream, CommonTokenStream, Token } from 'antlr4ng';
 import { CandidatesCollection } from 'antlr4-c3';
+import { CharStream, CommonTokenStream, Token } from 'antlr4ng';
+import { processTokenCandidates } from '../common/tokenUtils';
 import { FlinkSqlLexer } from '../../lib/flink/FlinkSqlLexer';
 import { FlinkSqlParser, ProgramContext } from '../../lib/flink/FlinkSqlParser';
 import {
@@ -11,13 +12,13 @@ import {
 } from '../common/types';
 import { BasicSQL } from '../common/basicSQL';
 import { StmtContextType } from '../common/entityCollector';
-import { FlinkSqlSplitListener } from './flinkSplitListener';
-import { FlinkEntityCollector } from './flinkEntityCollector';
 import { ErrorListener } from '../common/parseErrorListener';
+import { FlinkEntityCollector } from './flinkEntityCollector';
 import { FlinkErrorListener } from './flinkErrorListener';
 import { FlinkSemanticContextCollector } from './flinkSemanticContextCollector';
+import { FlinkSqlSplitListener } from './flinkSplitListener';
 
-export { FlinkSqlSplitListener, FlinkEntityCollector };
+export { FlinkEntityCollector, FlinkSqlSplitListener };
 
 export class FlinkSQL extends BasicSQL<FlinkSqlLexer, ProgramContext, FlinkSqlParser> {
     protected createLexerFromCharStream(charStreams: CharStream) {
@@ -50,9 +51,8 @@ export class FlinkSQL extends BasicSQL<FlinkSqlLexer, ProgramContext, FlinkSqlPa
         const parserContext = this;
         return new FlinkErrorListener(_errorListener, parserContext, this.preferredRules);
     }
-
-    protected createEntityCollector(input: string, caretTokenIndex?: number) {
-        return new FlinkEntityCollector(input, caretTokenIndex);
+    protected createEntityCollector(input: string, allTokens?: Token[], caretTokenIndex?: number) {
+        return new FlinkEntityCollector(input, allTokens, caretTokenIndex);
     }
 
     protected createSemanticContextCollector(
@@ -139,17 +139,9 @@ export class FlinkSQL extends BasicSQL<FlinkSqlLexer, ProgramContext, FlinkSqlPa
             }
         }
 
-        for (let candidate of candidates.tokens) {
-            const symbolicName = this._parser.vocabulary.getSymbolicName(candidate[0]);
-            const displayName = this._parser.vocabulary.getDisplayName(candidate[0]);
-            if (displayName && symbolicName && symbolicName.startsWith('KW_')) {
-                const keyword =
-                    displayName.startsWith("'") && displayName.endsWith("'")
-                        ? displayName.slice(1, -1)
-                        : displayName;
-                keywords.push(keyword);
-            }
-        }
+        const processedKeywords = processTokenCandidates(this._parser, candidates.tokens);
+        keywords.push(...processedKeywords);
+
         return {
             syntax: originalSyntaxSuggestions,
             keywords,
