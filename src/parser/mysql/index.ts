@@ -40,6 +40,7 @@ export class MySQL extends BasicSQL<MySqlLexer, ProgramContext, MySqlParser> {
         MySqlParser.RULE_functionNameCreate,
         MySqlParser.RULE_columnName,
         MySqlParser.RULE_columnNameCreate,
+        MySqlParser.RULE_keywordsCanBeId,
     ]);
 
     protected get splitListener() {

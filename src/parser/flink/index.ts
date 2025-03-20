@@ -41,6 +41,7 @@ export class FlinkSQL extends BasicSQL<FlinkSqlLexer, ProgramContext, FlinkSqlPa
         FlinkSqlParser.RULE_functionNameCreate, // functionName that will be created
         FlinkSqlParser.RULE_columnName,
         FlinkSqlParser.RULE_columnNameCreate,
+        FlinkSqlParser.RULE_identifier,
     ]);
 
     protected get splitListener() {

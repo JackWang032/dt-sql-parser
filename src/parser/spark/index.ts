@@ -40,6 +40,8 @@ export class SparkSQL extends BasicSQL<SparkSqlLexer, ProgramContext, SparkSqlPa
         SparkSqlParser.RULE_functionNameCreate,
         SparkSqlParser.RULE_columnName,
         SparkSqlParser.RULE_columnNameCreate,
+        SparkSqlParser.RULE_strictIdentifier,
+        SparkSqlParser.RULE_identifier,
     ]);
 
     protected get splitListener() {

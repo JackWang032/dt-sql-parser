@@ -40,6 +40,7 @@ export class ImpalaSQL extends BasicSQL<ImpalaSqlLexer, ProgramContext, ImpalaSq
         ImpalaSqlParser.RULE_viewNamePath,
         ImpalaSqlParser.RULE_databaseNamePath,
         ImpalaSqlParser.RULE_columnNamePath,
+        ImpalaSqlParser.RULE_nonReserved,
     ]);
 
     protected get splitListener() {

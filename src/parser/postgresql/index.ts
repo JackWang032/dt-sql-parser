@@ -44,6 +44,7 @@ export class PostgreSQL extends BasicSQL<PostgreSqlLexer, ProgramContext, Postgr
         PostgreSqlParser.RULE_procedure_name, // procedure name
         PostgreSqlParser.RULE_column_name_create, // column name that will be created
         PostgreSqlParser.RULE_column_name, // column name
+        PostgreSqlParser.RULE_nonreservedword,
     ]);
 
     protected get splitListener() {

@@ -42,6 +42,7 @@ export class HiveSQL extends BasicSQL<HiveSqlLexer, ProgramContext, HiveSqlParse
         HiveSqlParser.RULE_functionNameCreate, // function name that will be created
         HiveSqlParser.RULE_columnName,
         HiveSqlParser.RULE_columnNameCreate,
+        HiveSqlParser.RULE_nonReserved,
     ]);
 
     protected get splitListener() {

@@ -63,6 +63,7 @@ export class TrinoSQL extends BasicSQL<TrinoSqlLexer, ProgramContext, TrinoSqlPa
         TrinoSqlParser.RULE_functionNameCreate,
         TrinoSqlParser.RULE_columnRef,
         TrinoSqlParser.RULE_columnNameCreate,
+        TrinoSqlParser.RULE_nonReserved,
     ]);
 
     protected processCandidates(
