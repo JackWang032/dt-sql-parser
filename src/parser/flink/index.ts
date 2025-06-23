@@ -17,7 +17,6 @@ import { FlinkEntityCollector } from './flinkEntityCollector';
 import { FlinkErrorListener } from './flinkErrorListener';
 import { FlinkSemanticContextCollector } from './flinkSemanticContextCollector';
 import { FlinkSqlSplitListener } from './flinkSplitListener';
-import { FlinkSemanticContextCollector } from './flinkSemanticContextCollector';
 
 export { FlinkEntityCollector, FlinkSqlSplitListener };
 
