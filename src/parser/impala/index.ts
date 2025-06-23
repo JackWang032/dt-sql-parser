@@ -41,6 +41,7 @@ export class ImpalaSQL extends BasicSQL<ImpalaSqlLexer, ProgramContext, ImpalaSq
         ImpalaSqlParser.RULE_databaseNamePath,
         ImpalaSqlParser.RULE_columnNamePath,
         ImpalaSqlParser.RULE_nonReserved,
+        ImpalaSqlParser.RULE_columnName,
     ]);
 
     protected get splitListener() {
@@ -67,18 +68,13 @@ export class ImpalaSQL extends BasicSQL<ImpalaSqlLexer, ProgramContext, ImpalaSq
     protected processCandidates(
         candidates: CandidatesCollection,
         allTokens: Token[],
-        caretTokenIndex: number,
-        tokenIndexOffset: number
+        caretTokenIndex: number
     ): Suggestions<Token> {
         const originalSyntaxSuggestions: SyntaxSuggestion<Token>[] = [];
         const keywords: string[] = [];
         for (let candidate of candidates.rules) {
             const [ruleType, candidateRule] = candidate;
-            const startTokenIndex = candidateRule.startTokenIndex + tokenIndexOffset;
-            const tokenRanges = allTokens.slice(
-                startTokenIndex,
-                caretTokenIndex + tokenIndexOffset + 1
-            );
+            const tokenRanges = allTokens.slice(candidateRule.startTokenIndex, caretTokenIndex + 1);
 
             let syntaxContextType: EntityContextType | StmtContextType | undefined = void 0;
             switch (ruleType) {
@@ -121,6 +117,18 @@ export class ImpalaSQL extends BasicSQL<ImpalaSqlLexer, ProgramContext, ImpalaSq
                 case ImpalaSqlParser.RULE_columnNamePath: {
                     syntaxContextType = EntityContextType.COLUMN;
                 }
+                case ImpalaSqlParser.RULE_columnName: {
+                    if (
+                        candidateRule.ruleList.includes(ImpalaSqlParser.RULE_columnItem) ||
+                        candidateRule.ruleList.includes(ImpalaSqlParser.RULE_havingClause) ||
+                        candidateRule.ruleList.includes(ImpalaSqlParser.RULE_whereClause) ||
+                        candidateRule.ruleList.includes(ImpalaSqlParser.RULE_whenClause) ||
+                        candidateRule.ruleList.includes(ImpalaSqlParser.RULE_partitionByClause) ||
+                        candidateRule.ruleList.includes(ImpalaSqlParser.RULE_relation)
+                    ) {
+                        syntaxContextType = EntityContextType.COLUMN;
+                    }
+                }
                 default:
                     break;
             }
@@ -133,9 +141,9 @@ export class ImpalaSQL extends BasicSQL<ImpalaSqlLexer, ProgramContext, ImpalaSq
             }
         }
 
-        // 使用工具函数处理token候选项
         const processedKeywords = processTokenCandidates(this._parser, candidates.tokens);
         keywords.push(...processedKeywords);
+
         return {
             syntax: originalSyntaxSuggestions,
             keywords,

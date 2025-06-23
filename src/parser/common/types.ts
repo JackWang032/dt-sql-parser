@@ -46,6 +46,10 @@ export enum EntityContextType {
     COLUMN_CREATE = 'columnCreate',
     /** query result */
     QUERY_RESULT = 'queryResult',
+    /** table property key when creating table*/
+    TABLE_PROPERTY_KEY = 'tablePropertyKey',
+    /** table property value when creating table*/
+    TABLE_PROPERTY_VALUE = 'tablePropertyValue',
 }
 
 /**
