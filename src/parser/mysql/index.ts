@@ -17,7 +17,6 @@ import { MySqlEntityCollector } from './mysqlEntityCollector';
 import { MysqlErrorListener } from './mysqlErrorListener';
 import { MySqlSemanticContextCollector } from './mysqlSemanticContextCollector';
 import { MysqlSplitListener } from './mysqlSplitListener';
-import { MySqlSemanticContextCollector } from '../mysql/mysqlSemanticContextCollector';
 
 export { MySqlEntityCollector, MysqlSplitListener };
 
@@ -30,6 +29,11 @@ export class MySQL extends BasicSQL<MySqlLexer, ProgramContext, MySqlParser> {
         return new MySqlParser(tokenStream);
     }
 
+    /**
+     * The rules that keywords you don't want to be suggested.
+     */
+    protected excludeKeywordRules = new Set([MySqlParser.RULE_keywordsCanBeId]);
+
     protected preferredRules: Set<number> = new Set([
         MySqlParser.RULE_databaseName,
         MySqlParser.RULE_databaseNameCreate,
@@ -41,7 +45,7 @@ export class MySQL extends BasicSQL<MySqlLexer, ProgramContext, MySqlParser> {
         MySqlParser.RULE_functionNameCreate,
         MySqlParser.RULE_columnName,
         MySqlParser.RULE_columnNameCreate,
-        MySqlParser.RULE_keywordsCanBeId,
+        ...this.excludeKeywordRules,
     ]);
 
     protected get splitListener() {

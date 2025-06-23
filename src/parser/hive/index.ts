@@ -18,7 +18,6 @@ import { HiveEntityCollector } from './hiveEntityCollector';
 import { HiveErrorListener } from './hiveErrorListener';
 import { HiveSemanticContextCollector } from './hiveSemanticContextCollector';
 import { HiveSqlSplitListener } from './hiveSplitListener';
-import { HiveSemanticContextCollector } from './hiveSemanticContextCollector';
 
 export { HiveEntityCollector, HiveSqlSplitListener };
 
@@ -30,6 +29,11 @@ export class HiveSQL extends BasicSQL<HiveSqlLexer, ProgramContext, HiveSqlParse
     protected createParserFromTokenStream(tokenStream: CommonTokenStream) {
         return new HiveSqlParser(tokenStream);
     }
+
+    /**
+     * The rules that keywords you don't want to be suggested.
+     */
+    protected excludeKeywordRules = new Set([HiveSqlParser.RULE_nonReserved]);
 
     protected preferredRules: Set<number> = new Set([
         HiveSqlParser.RULE_dbSchemaName, // db or schema name
@@ -44,7 +48,7 @@ export class HiveSQL extends BasicSQL<HiveSqlLexer, ProgramContext, HiveSqlParse
         HiveSqlParser.RULE_columnName,
         HiveSqlParser.RULE_columnNamePath,
         HiveSqlParser.RULE_columnNameCreate,
-        HiveSqlParser.RULE_nonReserved,
+        ...this.excludeKeywordRules,
     ]);
 
     protected get splitListener() {
