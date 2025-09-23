@@ -35,7 +35,6 @@ export interface StmtContext {
     readonly parentStmt: StmtContext | null;
     readonly isContainCaret?: boolean;
     readonly scopeDepth: number;
-    readonly _ctx: ParserRuleContext;
     readonly text: string;
 }
 
@@ -58,7 +57,6 @@ export function toStmtContext(
         isContainCaret,
         text: stmtText,
         scopeDepth: type === StmtContextType.COMMON_STMT ? 0 : (parentStmt?.scopeDepth ?? 0) + 1,
-        _ctx: ctx,
     };
 }
 
@@ -102,12 +100,10 @@ export interface BaseEntityContext {
     readonly belongStmt: StmtContext;
     /** Reference to another entity or string */
     reference?: string | EntityContext;
-    /** Whether the entity is accessible from the caret position */
-    isAccessible: boolean;
+    /** Whether the entity is accessible from the caret position, **ONLY** applicable to table entity */
+    isAccessible: boolean | null;
     /** Entities related to this entity */
     relatedEntities: EntityContext[] | null;
-    /** The parser rule context for this entity, it will be deleted after the entity is collected because of json serialization */
-    _ctx?: ParserRuleContext;
     /** Comment attribute for this entity */
     [AttrName.comment]: WordRange | null;
     /** Alias attribute for this entity */
@@ -119,7 +115,7 @@ export interface BaseEntityContext {
  */
 export enum ColumnDeclareType {
     /** Literal column name */
-    COMMON,
+    LITERAL,
     /** Using asterisk syntax (tableName.*) */
     ALL,
     /** Complex expressions like subqueries, case statements, function calls */
@@ -131,7 +127,7 @@ export enum ColumnDeclareType {
  */
 export enum TableDeclareType {
     /** Regular table reference */
-    COMMON,
+    LITERAL,
     /** Table defined by expression (e.g., subquery) */
     EXPRESSION,
 }
@@ -225,7 +221,6 @@ export function toEntityContext(
         position,
         belongStmt,
         declareType: metaInfo?.declareType,
-        _ctx: ctx,
         [AttrName.comment]: null,
     };
     switch (entityInfo.entityContextType) {
@@ -328,10 +323,10 @@ function findAttributeChildren(
  * @returns true if entity is contained within rangeEntity's range
  */
 function isEntityInScope(entity: EntityContext, rangeEntity: EntityContext): boolean {
-    const entityStart = entity._ctx?.start?.tokenIndex;
-    const entityStop = entity._ctx?.stop?.tokenIndex;
-    const rangeStart = rangeEntity._ctx?.start?.tokenIndex;
-    const rangeStop = rangeEntity._ctx?.stop?.tokenIndex;
+    const entityStart = entity.position.startTokenIndex;
+    const entityStop = entity.position.endTokenIndex;
+    const rangeStart = rangeEntity.position.startTokenIndex;
+    const rangeStop = rangeEntity.position.endTokenIndex;
 
     return (
         entityStart != null &&
@@ -374,7 +369,11 @@ export abstract class EntityCollector {
      */
     private _caretStmtScopeDepth: number;
 
-    /** The nearest statement containing the caret */
+    /**
+     * The nearest statement containing the caret,
+     * Not used for now.
+     */
+    // @ts-ignore
     private _caretStmt: StmtContext | null;
 
     /**
@@ -408,77 +407,10 @@ export abstract class EntityCollector {
 
     exitProgram() {
         const entities = Array.from(this._entitiesSet);
-        this.removeCtxAttr();
         if (this._caretTokenIndex !== -1) {
             this.attachAccessibleToEntities(entities);
         }
         this._entityStack.clear();
-    }
-
-    /**
-     * Remove _ctx property to avoid circular references during JSON serialization
-     */
-    private removeCtxAttr() {
-        const entities = Array.from(this._entitiesSet);
-        // Use WeakSet to track processed objects and avoid infinite recursion from circular references
-        const processed = new WeakSet();
-
-        const removeCtx = (obj: any) => {
-            if (!obj || typeof obj !== 'object' || processed.has(obj)) {
-                return;
-            }
-            processed.add(obj);
-
-            if ('_ctx' in obj) {
-                obj._ctx = undefined;
-            }
-
-            if (obj.belongStmt) {
-                removeCtx(obj.belongStmt);
-            }
-
-            if (obj.rootStmt) {
-                removeCtx(obj.rootStmt);
-            }
-
-            if (obj.parentStmt) {
-                removeCtx(obj.parentStmt);
-            }
-
-            if (obj.relatedEntities && Array.isArray(obj.relatedEntities)) {
-                obj.relatedEntities.forEach(removeCtx);
-            }
-
-            if (obj.columns && Array.isArray(obj.columns)) {
-                obj.columns.forEach(removeCtx);
-            }
-        };
-
-        entities.forEach(removeCtx);
-    }
-
-    /**
-     * Determines if the caret is inside a derived table subquery
-     * For example, in: SELECT id FROM t1, (SELECT name from t2) as t3
-     * Checks if the caret is inside the subquery (SELECT name from t2)
-     * @returns Whether the caret is inside a derived table subquery
-     */
-    protected isCaretInDerivedTableStmt(): boolean {
-        if (!this._caretStmt) {
-            return false;
-        }
-
-        // Check all entities to find a derived table entity containing the subquery where the caret is located
-        return this.getEntities().some(
-            (entity) =>
-                entity.entityContextType === EntityContextType.TABLE &&
-                entity.belongStmt.isContainCaret &&
-                entity.relatedEntities?.some(
-                    (relatedEntity) =>
-                        relatedEntity.entityContextType === EntityContextType.QUERY_RESULT &&
-                        relatedEntity.belongStmt === this._caretStmt
-                )
-        );
     }
 
     /**
@@ -497,13 +429,12 @@ export abstract class EntityCollector {
 
             const entityScopeDepth = entity.belongStmt.scopeDepth ?? 0;
 
-            // First, the entity must be in a statement containing the caret to potentially be accessible
-            entity.isAccessible = entity.belongStmt.isContainCaret ?? false;
-
-            // For table-type entities, we need to judge accessibility based on scope depth
             if (entity.entityContextType === EntityContextType.TABLE) {
                 entity.isAccessible =
-                    entity.isAccessible && entityScopeDepth === this._caretStmtScopeDepth;
+                    !!entity.belongStmt.isContainCaret &&
+                    entityScopeDepth === this._caretStmtScopeDepth;
+            } else {
+                entity.isAccessible = null;
             }
 
             // Recursively process related entities
@@ -729,8 +660,14 @@ export abstract class EntityCollector {
             return Array.from(
                 new Set([...tableSourceEntities, ...queryResultEntities, ...otherEntities])
             );
+        } else {
+            // Do not collect column and queryResult entities if they are not inside a select statement
+            return entitiesInsideStmt.filter(
+                (entity) =>
+                    entity.entityContextType !== EntityContextType.COLUMN &&
+                    entity.entityContextType !== EntityContextType.QUERY_RESULT
+            );
         }
-        return entitiesInsideStmt;
     }
 
     protected combineQueryResultStmtEntities(
